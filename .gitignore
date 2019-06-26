@@ -474,5 +474,6 @@ dmypy.json
 .pyre/
 
 
+#local files and path to exclude
 
-
+.DS_Store
