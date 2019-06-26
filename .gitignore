@@ -476,4 +476,4 @@ dmypy.json
 
 #local files and path to exclude
 
-.DS_Store
+*.DS_Store
