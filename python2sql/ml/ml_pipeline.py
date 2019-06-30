@@ -104,7 +104,10 @@ class MLPipeline(object):
 
         if train:
             #transformer = transformation_type(**transformation_params)
-            transformer.fit(data)
+            if target_attribute != None:
+                transformer.fit(data[target_attribute])
+            else:
+                transformer.fit(data)
             transformer.feature_names = list(data.columns.values)
 
         if target_attribute != None:
