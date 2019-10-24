@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <LangVersion>7.2</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="assets\input\.gitignore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="assets\input\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CreditCardFraudDetection.Common\CreditCardFraudDetection.Common.csproj" />
+    <ProjectReference Include="..\CreditCardFraudDetection.Trainer\CreditCardFraudDetection.Trainer.csproj" />
+  </ItemGroup>
+  
+</Project>
