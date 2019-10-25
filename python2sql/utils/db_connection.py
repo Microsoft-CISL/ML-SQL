@@ -9,9 +9,8 @@ class DatabaseConnectionManager(object):
     def get_string_db_connection(self, dbms, database, charset=None):
 
         if dbms == "mysql":
-            self.username = "root"
-            #self.password = "ML+matteo<3paolo+SQL"
-            self.password = "ndulsp+92+pgnll"
+            self.username = "xxx"
+            self.password = "xxx"
             dialect = 'mysql+pymysql'
 
             # if charset:
@@ -19,8 +18,8 @@ class DatabaseConnectionManager(object):
             # else:
             db_string = '{}://{}:{}@{}/{}'.format(dialect, self.username, self.password, self.host, database)
         elif dbms == "sqlserver":
-            self.username = "SA"
-            self.password = "ML+matteo<3paolo+SQL"
+            self.username = "xxx"
+            self.password = "xxx"
             # pymssql
             dialect = 'mssql+pymssql'
 
