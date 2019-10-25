@@ -15,7 +15,6 @@ namespace QueryExecutor
 
             //Configuration configuration = new Configuration();
 
-            //configuration.MYSQL_PATH__QUERY_CONSOLE = "/Users/paolosottovia/Downloads/testQuery.sql";
             //configuration.MYSQL_PATH__QUERY_CSV = "";
             //configuration.MYSQL_PATH__QUERY_DB = "";
             //configuration.MYSQL_PATH__QUERY_NO_OUTPUT = "";
@@ -55,7 +54,7 @@ namespace QueryExecutor
                 string[] modes = { "CONSOLE", "CSV", "DB", "NO_OUTPUT" };
 
 
-                Executor executor = new Executor("server=localhost;Uid=root;Pwd=ML+matteo<3paolo+SQL;Database=MLtoSQL", "server=localhost;Uid=SA;Pwd=ML+matteo<3paolo+SQL;Database=mltosql");
+                Executor executor = new Executor("server=localhost;Uid=xxx;Pwd=xxx;Database=MLtoSQL", "server=localhost;Uid=xxx;Pwd=xxx;Database=mltosql");
                 executor.name = configuration.NAME;
 
 
