@@ -6,12 +6,10 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sqlalchemy import create_engine
+from .utils import evaluate_binary_classification_results, evaluate_regression_results, evaluate_multi_classification_results
 
 
 class MLPipeline(object):
-    """
-    TODO
-    """
 
     def __init__(self, output_dir):
         self.output_dir = output_dir
@@ -23,6 +21,8 @@ class MLPipeline(object):
         self.transformations = []
         self.prediction_pipeline_times = {}
         self.prediction_step_names = []
+        #engine = create_engine('mysql+pymysql://root:ndulsp+92+pgnll@localhost/ml_sql_test')
+        #self.connection = engine.connect()
 
     def load_data(self, data_file, class_attribute, columns=None, sep=','):
 
@@ -96,24 +96,25 @@ class MLPipeline(object):
     def apply_transformation(self, data, transformer, train=True, target_attribute=None):
 
         print("[BEGIN] STARTING DATA SET TRANSFORMATION...")
-        # TODO: RESTORING TRANSFORMED TRAIN SET FROM FILE?
 
         transformation_name = type(transformer).__name__
 
         start_time_transformation = time.time()
 
         if train:
-            #transformer = transformation_type(**transformation_params)
             if target_attribute != None:
+                data[target_attribute] = data[target_attribute].astype('str')
                 transformer.fit(data[target_attribute])
             else:
                 transformer.fit(data)
             transformer.feature_names = list(data.columns.values)
 
         if target_attribute != None:
+            data[target_attribute] = data[target_attribute].astype('str')
             transformed_dataset = transformer.transform(data[target_attribute])
         else:
             transformed_dataset = transformer.transform(data)
+
         print("Data (after {} transformation):".format(transformation_name))
         print("\tNum. rows: {}".format(transformed_dataset.shape[0]))
         print("\tNum. features: {}".format(transformed_dataset.shape[1]))
@@ -135,15 +136,53 @@ class MLPipeline(object):
 
         return transformed_dataset
 
-    def train_classifier(self, x_data, y_data, features, classifier):
+    def train_regressor(self, x_data, y_data, features, regressor, fit_method=None, save_restore_model=False):
+        print("[BEGIN] STARTING TRAINING REGRESSOR...")
 
-        print("[BEGIN] STARTING TRAINING CLASSIFIER...")
-        # TODO: RESTORING TRAINED MODEL FROM FILE?
-
-        model_file_path = os.path.join(self.output_dir, 'model.pkl')
+        regressor_name = type(regressor).__name__
+        model_file_path = os.path.join(self.output_dir, '{}_model.pkl'.format(regressor_name))
         exists = os.path.isfile(model_file_path)
 
-        if exists:  # restore previously generated model
+        if exists and save_restore_model:  # restore previously generated model
+
+            print("\nRestoring previously generated model...")
+            # load the model from disk
+            self.regressor = pickle.load(open(model_file_path, 'rb'))
+            print("Model restored successfully.\n")
+
+        else:  # train the classifier
+
+            start_time_training = time.time()
+
+            if not fit_method:
+                regressor.fit(x_data, y_data)
+            else:
+                # FIXME: ho harcodato un modello di regressione in questa linea perché il formato di invocazione del metodo fit non è standard
+                regressor = regressor.fit(method=fit_method, maxiter=1000)
+            regressor.feature_names = features
+            self.regressor = regressor
+
+            training_time = time.time() - start_time_training
+            print("Training time: {}".format(training_time))
+
+            if save_restore_model:
+                print("Starting saving models...")
+                pickle.dump(regressor, open(model_file_path, 'wb'))
+                print("Model saved successfully.")
+
+        print("[END] REGRESSOR TRAINING COMPLETED.\n")
+
+        return self.regressor
+
+    def train_classifier(self, x_data, y_data, features, classifier, save_restore_model=False):
+
+        print("[BEGIN] STARTING TRAINING CLASSIFIER...")
+
+        classifier_name = type(classifier).__name__
+        model_file_path = os.path.join(self.output_dir, '{}_model.pkl'.format(classifier_name))
+        exists = os.path.isfile(model_file_path)
+
+        if exists and save_restore_model:  # restore previously generated model
 
             print("\nRestoring previously generated model...")
             # load the model from disk
@@ -154,28 +193,51 @@ class MLPipeline(object):
 
             start_time_training = time.time()
 
-            #classifier = classifier_type(**classifier_params)
             classifier.fit(x_data, y_data)
             classifier.feature_names = features
-            classifier.class_labels = np.unique(y_data.values)
+            if isinstance(y_data, np.ndarray):
+                classifier.class_labels = np.unique(y_data)
+            else:
+                classifier.class_labels = np.unique(y_data.values)
             self.classifier = classifier
 
             training_time = time.time() - start_time_training
             print("Training time: {}".format(training_time))
 
-            print("Starting saving models...")
-            pickle.dump(classifier, open(model_file_path, 'wb'))
-            print("Model saved successfully.")
+            if save_restore_model:
+                print("Starting saving models...")
+                pickle.dump(classifier, open(model_file_path, 'wb'))
+                print("Model saved successfully.")
 
         print("[END] CLASSIFIER TRAINING COMPLETED.\n")
 
-    def perform_classifier_predictions(self, data, output):
+        return self.classifier
+
+    def perform_classifier_predictions(self, data, output, y_true, classification_type='binary', db_connection=None):
 
         print("[BEGIN] STARTING CLASSIFIER PREDICTION...")
 
         start_time_prediction = time.time()
 
         y_pred = self.classifier.predict(data)
+        try:
+            if classification_type == 'binary':
+                probs_for_all_classes = self.classifier.predict_proba(data)
+                probs_for_predicted_class = []
+                for probs in probs_for_all_classes:
+                    prob = max(probs)
+                    probs_for_predicted_class.append(prob)
+            elif classification_type == 'multi':
+                probs_for_predicted_class = self.classifier.predict_proba(data)
+            else:
+                raise ValueError("Only binary and multi classification supported. Use 'binary' or 'multi' parameters only.")
+        except AttributeError:
+            probs_for_predicted_class = []
+            print("The classifier doesn't have the method predict_proba. This variable will be set to an empty list.")
+
+        scores = self.classifier.decision_function(data)
+        self.probs = probs_for_predicted_class
+        self.scores = scores
         self.y_pred = y_pred
 
         if output:
@@ -183,17 +245,20 @@ class MLPipeline(object):
                 print("console")
                 print(self.y_pred)
             elif output == "db":
-                print("db")
-                chunk_predictions = pd.DataFrame(data={'prediction': y_pred})
-                # FIXME: add STRING DB CONNECTION
-                engine = create_engine('STRING DB CONNECTION')
-                chunk_predictions.to_sql('chunk_predictions', con=engine, if_exists="replace", index=False)
+                if db_connection:
+                    print("db")
+                    chunk_predictions = pd.DataFrame(data={'prediction': y_pred})
+                    # chunk_predictions.to_sql('chunk_predictions', con=db_connection, if_exists="replace", index=False, method='multi')
+                    #chunk_predictions.to_sql('chunk_predictions', con=db_connection, if_exists="append", index=False,
+                    #                         method='multi')
+                    chunk_predictions.to_sql('chunk_predictions', con=db_connection, if_exists="append", index=False)
             elif output == "file":
                 print("file")
-                chunk_predictions = pd.DataFrame(data={'prediction': y_pred})
-                chunk_predictions.to_csv(os.path.join(self.output_dir, "chunk_predictions.csv"), index=False)
+                chunk_predictions = pd.DataFrame(data={'prediction': y_pred, 'true': y_true})
+                chunk_predictions.to_csv(os.path.join(self.output_dir, "chunk_predictions_new.csv"), index=False)
             else:
                 print("ERROR OUTPUT METHOD")
+                exit(1)
 
         prediction_time = time.time() - start_time_prediction
         print("Prediction time: {}".format(prediction_time))
@@ -203,38 +268,117 @@ class MLPipeline(object):
 
         print("[END] CLASSIFIFER PREDICTION COMPLETED.\n")
 
-        return y_pred
+        return y_pred, probs_for_predicted_class, scores
 
-    def execute_prediction_pipeline(self, x_data, y_data, output=None, transformation_target_attribute=None):
+    def perform_regression_predictions(self, data, output, y_true, db_connection=None):
+
+        print("[BEGIN] STARTING REGRESSION PREDICTION...")
+
+        start_time_prediction = time.time()
+
+        y_pred = self.regressor.predict(data)
+        # no probability in regression task
+        probs = None
+        self.y_pred = y_pred
+        # set the scores equals to regression prediction
+        self.scores = y_pred
+        self.probs = probs
+
+        if output:
+            if output == "console":
+                print("console")
+                print(self.y_pred)
+            elif output == "db":
+                if db_connection:
+                    print("db")
+                    chunk_predictions = pd.DataFrame(data={'prediction': y_pred})
+                    # chunk_predictions.to_sql('chunk_predictions', con=db_connection, if_exists="replace", index=False, method='multi')
+                    #chunk_predictions.to_sql('chunk_predictions', con=db_connection, if_exists="append", index=False,
+                    #                         method='multi')
+                    chunk_predictions.to_sql('chunk_predictions', con=db_connection, if_exists="append", index=False)
+            elif output == "file":
+                print("file")
+                chunk_predictions = pd.DataFrame(data={'prediction': y_pred, 'true': y_true})
+                chunk_predictions.to_csv(os.path.join(self.output_dir, "chunk_predictions_new.csv"), index=False)
+            else:
+                print("ERROR OUTPUT METHOD")
+                exit(1)
+
+        prediction_time = time.time() - start_time_prediction
+        print("Prediction time: {}".format(prediction_time))
+
+        self.prediction_pipeline_times["prediction"] = prediction_time*1000
+        self.prediction_step_names.append("prediction")
+
+        print("[END] REGRESSION PREDICTION COMPLETED.\n")
+
+        return y_pred, self.probs, y_pred
+
+    def execute_prediction_pipeline(self, x_data, y_data, output=None, transformation_target_attribute=None, ml_task_type="classification", evaluate_model=True, db_connection=None):
 
         print("[BEGIN] STARTING PREDICTION PIPELINE...")
         self.prediction_pipeline_times = {}
         start_time = time.time()
 
         # feature removal ----------------------------------------------------
-        transformed_dataset = self.drop_features_from_data(x_data, self.drop_features, train=False)
-        # --------------------------------------------------------------------
+        if len(self.drop_features) > 0:
+            transformed_dataset = self.drop_features_from_data(x_data, self.drop_features, train=False)
+        else:
+            transformed_dataset = x_data
+            # --------------------------------------------------------------------
 
         # transformation -----------------------------------------------------
-        # FIXME: A TARGET ATTRIBUTE FOR EACH TRANSFORMATION
         for transformer in self.transformations:
             transformed_dataset = self.apply_transformation(transformed_dataset, transformer, train=False, target_attribute=transformation_target_attribute)
         # --------------------------------------------------------------------
+        self.last_transformed_dataset = transformed_dataset
 
-        # prediction ---------------------------------------------------------
-        y_pred = self.perform_classifier_predictions(transformed_dataset, output)
-        # --------------------------------------------------------------------
+        if ml_task_type == "classification":
 
-        # classification evalutation -----------------------------------------
-        #classifier_name = type(self.classifier).__name__
-        #evaluate_binary_classification_results(classifier_name, y_data, y_pred)
-        # --------------------------------------------------------------------
+            # prediction ---------------------------------------------------------
+            y_pred, probs, scores = self.perform_classifier_predictions(transformed_dataset, output, y_data, db_connection=db_connection)
+            # --------------------------------------------------------------------
+
+            # classification evaluation -----------------------------------------
+            classifier_name = type(self.classifier).__name__
+            if evaluate_model:
+                evaluate_binary_classification_results(classifier_name, y_data, y_pred, self.output_dir)
+            # --------------------------------------------------------------------
+
+        elif ml_task_type == "regression":
+
+            # prediction ---------------------------------------------------------
+            y_pred, probs, scores = self.perform_regression_predictions(transformed_dataset, output, y_data, db_connection=db_connection)
+            # --------------------------------------------------------------------
+
+            # regression evalutation ---------------------------------------------
+            regressor_name = type(self.regressor).__name__
+            if evaluate_model:
+                evaluate_regression_results(regressor_name, y_data, y_pred, self.output_dir)
+            # --------------------------------------------------------------------
+
+        elif ml_task_type == "multi-classification":
+
+            # prediction ---------------------------------------------------------
+            y_pred, probs, scores = self.perform_classifier_predictions(transformed_dataset, output, y_data, classification_type='multi', db_connection=db_connection)
+            # --------------------------------------------------------------------
+
+            # classification evalutation -----------------------------------------
+            classifier_name = type(self.classifier).__name__
+            if evaluate_model:
+                evaluate_multi_classification_results(classifier_name, y_data, y_pred, probs, self.output_dir)
+
+            # --------------------------------------------------------------------
+        else:
+            raise ValueError("Wrong machine learning task type.")
 
         total_time = time.time() - start_time
         print("Total time: {}".format(total_time))
         #self.prediction_pipeline_times["total"] = total_time*1000
 
         print("[END] PREDICTION PIPELINE COMPLETED.\n")
+
+        return y_pred, probs, scores
 
     def get_classifier(self):
         return self.classifier
@@ -247,3 +391,12 @@ class MLPipeline(object):
 
     def get_prediction_step_names(self):
         return self.prediction_step_names
+
+    def get_regressor(self):
+        return self.regressor
+
+    def set_regressor(self, regressor):
+        self.regressor = regressor
+
+    def get_last_transformed_dataset(self):
+        return self.last_transformed_dataset

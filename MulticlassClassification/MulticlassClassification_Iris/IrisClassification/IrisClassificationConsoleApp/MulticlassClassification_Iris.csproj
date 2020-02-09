@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="datasets\**" />
+    <EmbeddedResource Remove="datasets\**" />
+    <None Remove="datasets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\Data\iris-test.txt" Link="Data\iris-test.txt" />
+    <Content Include="..\Data\iris-train.txt" Link="Data\iris-train.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Data\" />
+    <Folder Include="Common\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\ML2SQL\ML2SQL\ML2SQL.csproj" />
+  </ItemGroup>
+</Project>

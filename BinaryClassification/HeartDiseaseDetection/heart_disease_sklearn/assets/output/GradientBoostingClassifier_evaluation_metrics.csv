@@ -1,0 +1,9 @@
+,score
+accuracy,0.9933993399339934
+positive_precision,1.0
+positive_recall,0.9856115107913669
+negative_precision,0.9879518072289156
+negative_recall,1.0
+f1,0.9927536231884058
+auc,0.9928057553956835
+log_loss,0.22797872207861936
