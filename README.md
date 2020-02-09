@@ -1,2 +1,2 @@
-# ML2SQL
-Translator mapping ML pipelines into SQL queries
+# ML@SQL
+Translator mapping trained ML pipelines into SQL queries
